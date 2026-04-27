@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Three.js Model Viewer</title>
 
   <!-- Bootstrap -->
@@ -13,20 +14,64 @@
 
 <body>
 
-  <!-- UI PANEL -->
+  <!-- LEFT PANEL: Import + Export -->
   <div id="ui-panel" class="card shadow-lg border-0">
     <div class="card-header bg-primary text-white fw-bold">
       3D Model Viewer
     </div>
 
     <div class="card-body">
-      <p class="small mb-3">
-        Supported:<br>
-        <strong>GLTF, GLB, OBJ, FBX, STL, PLY, 3MF</strong>
-      </p>
 
+      <h6 class="fw-bold mb-2">Import</h6>
+      <p class="small mb-2">
+        Supported: <strong>GLTF, GLB, OBJ, FBX, STL, PLY, 3MF</strong>
+      </p>
       <input type="file" id="fileInput" class="form-control mb-3"
         accept=".glb,.gltf,.obj,.fbx,.stl,.ply,.3mf"/>
+
+      <button id="resetBtn" class="btn btn-danger btn-sm w-100 mb-3">
+        Reset Scene
+      </button>
+
+      <hr>
+
+      <h6 class="fw-bold mb-2">Export</h6>
+      <p class="small mb-2">
+        Supported: <strong>GLB, GLTF, OBJ, STL, PLY</strong>
+      </p>
+
+      <label class="form-label small">Format</label>
+      <select id="exportFormat" class="form-select form-select-sm mb-3">
+        <option value="glb">GLB (Binary GLTF)</option>
+        <option value="gltf">GLTF (JSON + assets)</option>
+        <option value="obj">OBJ (Wavefront)</option>
+        <option value="stl-bin">STL Binary</option>
+        <option value="stl-ascii">STL ASCII</option>
+        <option value="ply-bin">PLY Binary</option>
+        <option value="ply-ascii">PLY ASCII</option>
+      </select>
+
+      <button id="exportBtn" class="btn btn-dark btn-sm w-100" disabled>
+        <span id="exportBtnText" style="text-decoration: line-through;">Export</span>
+      </button>
+
+      <p id="exportNote" class="text-muted small mt-2 mb-0" style="display:none;"></p>
+
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL: Stats + Lighting + View -->
+  <div id="right-panel" class="card shadow-lg border-0">
+    <div class="card-header bg-primary text-white fw-bold">
+      Scene
+    </div>
+
+    <div class="card-body">
+
+      <h6 class="fw-bold mb-2">Stats</h6>
+      <p class="small mb-0">Meshes: <span id="meshCount">0</span></p>
+      <p class="small mb-0">Vertices: <span id="vertexCount">0</span></p>
+      <p class="small mb-3">Triangles: <span id="triangleCount">0</span></p>
 
       <hr>
 
@@ -45,7 +90,7 @@
 
       <h6 class="fw-bold mb-2">View</h6>
 
-      <div class="form-check form-switch mb-3">
+      <div class="form-check form-switch mb-2">
         <input class="form-check-input" type="checkbox" id="btnSwitch">
         <label class="form-check-label small">Dark Mode</label>
       </div>
@@ -55,35 +100,17 @@
         <label class="form-check-label small">Grid Floor</label>
       </div>
 
-      <div class="form-check form-switch mb-3">
+      <div class="form-check form-switch mb-0">
         <input class="form-check-input" type="checkbox" id="wireToggle">
         <label class="form-check-label small">Wireframe</label>
       </div>
 
-      <button id="resetBtn" class="btn btn-danger btn-sm w-100">
-        Reset Scene
-      </button>
-    </div>
-  </div>
-
-  <!-- STATS PANEL -->
-  <div id="stats-panel" class="card shadow-lg border-0">
-    <div class="card-header bg-primary text-white fw-bold">
-      Scene Stats
-    </div>
-
-    <div class="card-body small">
-      Meshes: <span id="meshCount">0</span><br>
-      Vertices: <span id="vertexCount">0</span><br>
-      Triangles: <span id="triangleCount">0</span>
     </div>
   </div>
 
   <!-- THREE.JS -->
   <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
-
   <script src="https://unpkg.com/fflate@0.8.2/umd/index.js"></script>
-
   <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
@@ -91,6 +118,12 @@
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/PLYLoader.js"></script>
   <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/3MFLoader.js"></script>
+
+  <!-- Exporters -->
+  <script src="https://unpkg.com/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/exporters/OBJExporter.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/exporters/PLYExporter.js"></script>
 
   <!-- Main JS -->
   <script src="script.js"></script>

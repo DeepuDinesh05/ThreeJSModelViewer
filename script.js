@@ -49,6 +49,8 @@ function init() {
   dirIntensity.oninput = e => dirLight.intensity = e.target.value;
   ambIntensity.oninput = e => ambientLight.intensity = e.target.value;
 
+  exportBtn.onclick = exportModel;
+
   initTheme();
 }
 
@@ -78,124 +80,209 @@ function syncSceneTheme(dark) {
 }
 
 function loadFile(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      resetScene();
+  const file = e.target.files[0];
+  if (!file) return;
+  resetScene();
 
-      const ext = file.name.split(".").pop().toLowerCase();
-      const reader = new FileReader();
+  const ext = file.name.split(".").pop().toLowerCase();
+  const reader = new FileReader();
 
-      if (ext === "obj") {
-        reader.onload = ev => prepare(loaders.obj.parse(ev.target.result));
-        reader.readAsText(file);
-        return;
-      }
+  if (ext === "obj") {
+    reader.onload = ev => prepare(loaders.obj.parse(ev.target.result));
+    reader.readAsText(file);
+    return;
+  }
 
-      reader.onload = ev => {
-        if (ext === "gltf" || ext === "glb")
-          loaders.gltf.parse(ev.target.result, "", g => prepare(g.scene));
-        else if (ext === "fbx")
-          prepare(loaders.fbx.parse(ev.target.result));
-        else if (ext === "stl")
-          prepare(new THREE.Mesh(
-            loaders.stl.parse(ev.target.result),
-            new THREE.MeshStandardMaterial({ color: 0x888888 })
-          ));
-        else if (ext === "ply")
-          prepare(loaders.ply.parse(ev.target.result));
-        else if (ext === "3mf")
-          prepare(loaders.m3f.parse(ev.target.result));
-      };
+  reader.onload = ev => {
+    if (ext === "gltf" || ext === "glb")
+      loaders.gltf.parse(ev.target.result, "", g => prepare(g.scene));
+    else if (ext === "fbx")
+      prepare(loaders.fbx.parse(ev.target.result));
+    else if (ext === "stl")
+      prepare(new THREE.Mesh(
+        loaders.stl.parse(ev.target.result),
+        new THREE.MeshStandardMaterial({ color: 0x888888 })
+      ));
+    else if (ext === "ply")
+      prepare(loaders.ply.parse(ev.target.result));
+    else if (ext === "3mf")
+      prepare(loaders.m3f.parse(ev.target.result));
+  };
 
-      reader.readAsArrayBuffer(file);
-    }
+  reader.readAsArrayBuffer(file);
+}
 
 function prepare(obj) {
-if (!obj.isObject3D)
+  if (!obj.isObject3D)
     obj = new THREE.Mesh(obj, new THREE.MeshStandardMaterial());
 
-obj.traverse(o => o.isMesh && (o.material.wireframe = showWireframe));
+  obj.traverse(o => o.isMesh && (o.material.wireframe = showWireframe));
 
-// FIRST bounding box (for scaling)
-const box = new THREE.Box3().setFromObject(obj);
-const size = box.getSize(new THREE.Vector3()).length();
-const center = box.getCenter(new THREE.Vector3());
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3()).length();
+  const center = box.getCenter(new THREE.Vector3());
 
-// Center model at origin (ignoring scale for now)
-obj.position.sub(center);
+  obj.position.sub(center);
+  obj.scale.multiplyScalar(4 / size);
 
-// Scale FIRST
-obj.scale.multiplyScalar(4 / size);
+  const scaledBox = new THREE.Box3().setFromObject(obj);
+  obj.position.y -= scaledBox.min.y;
 
-// Recalculate bounding box AFTER scaling
-const scaledBox = new THREE.Box3().setFromObject(obj);
+  currentModel = obj;
+  scene.add(obj);
+  updateStats(obj);
 
-// Lift model so it sits ON TOP of the grid (y = 0)
-obj.position.y -= scaledBox.min.y;
+  const finalBox = new THREE.Box3().setFromObject(obj);
+  const finalCenter = finalBox.getCenter(new THREE.Vector3());
+  const finalSize = finalBox.getSize(new THREE.Vector3());
 
-currentModel = obj;
-scene.add(obj);
-updateStats(obj);
+  controls.target.copy(finalCenter);
+  controls.update();
 
-// Recalculate bounding box AFTER everything
-const finalBox = new THREE.Box3().setFromObject(obj);
-const finalCenter = finalBox.getCenter(new THREE.Vector3());
-const finalSize = finalBox.getSize(new THREE.Vector3());
+  const maxDim = Math.max(finalSize.x, finalSize.y, finalSize.z);
+  const fov = camera.fov * (Math.PI / 180);
+  let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
 
-// Center orbit controls on model
-controls.target.copy(finalCenter);
-controls.update();
+  camera.position.set(
+    finalCenter.x,
+    finalCenter.y + maxDim * 0.5,
+    finalCenter.z + cameraZ
+  );
+  camera.lookAt(finalCenter);
 
-// Move camera to fit model nicely
-const maxDim = Math.max(finalSize.x, finalSize.y, finalSize.z);
-const fov = camera.fov * (Math.PI / 180);
-let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+  grid.position.x = finalCenter.x;
+  grid.position.z = finalCenter.z;
 
-// Add some padding so it's not tight
-cameraZ *= 1.5;
-
-camera.position.set(
-  finalCenter.x,
-  finalCenter.y + maxDim * 0.5,
-  finalCenter.z + cameraZ
-);
-
-camera.lookAt(finalCenter);
-
-grid.position.x = finalCenter.x;
-grid.position.z = finalCenter.z;
+  // Enable export button
+  setExportEnabled(true);
 }
 
 function toggleWireframe(enabled) {
-    showWireframe = enabled;
-    currentModel?.traverse(o => o.isMesh && (o.material.wireframe = enabled));
+  showWireframe = enabled;
+  currentModel?.traverse(o => o.isMesh && (o.material.wireframe = enabled));
 }
 
 function resetScene() {
-    if (!currentModel) return;
-    scene.remove(currentModel);
-    currentModel = null;
-    updateStats({ traverse: () => {} });
+  if (!currentModel) return;
+  scene.remove(currentModel);
+  currentModel = null;
+  updateStats({ traverse: () => {} });
+  setExportEnabled(false);
+  exportNote.style.display = "none";
 }
 
 function updateStats(obj) {
-    let m = 0, v = 0, t = 0;
-    obj.traverse(o => {
+  let m = 0, v = 0, t = 0;
+  obj.traverse(o => {
     if (o.isMesh) {
-        m++;
-        const p = o.geometry.attributes.position;
-        v += p.count;
-        t += o.geometry.index ? o.geometry.index.count / 3 : p.count / 3;
+      m++;
+      const p = o.geometry.attributes.position;
+      v += p.count;
+      t += o.geometry.index ? o.geometry.index.count / 3 : p.count / 3;
     }
-    });
-    meshCount.textContent = m;
-    vertexCount.textContent = v;
-    triangleCount.textContent = t;
+  });
+  meshCount.textContent = m;
+  vertexCount.textContent = v;
+  triangleCount.textContent = t;
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+function setExportEnabled(enabled) {
+  exportBtn.disabled = !enabled;
+  exportBtn.classList.toggle('btn-success', enabled);
+  exportBtn.classList.toggle('btn-dark', !enabled);
+  exportBtnText.style.textDecoration = enabled ? 'none' : 'line-through';
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function showNote(msg) {
+  exportNote.textContent = msg;
+  exportNote.style.display = "block";
+}
+
+function exportModel() {
+  if (!currentModel) return;
+
+  const fmt = exportFormat.value;
+  exportBtnText.textContent = "Exporting…";
+  exportBtn.disabled = true;
+  exportNote.style.display = "none";
+
+  // Temporarily disable wireframe for export, restore after
+  const wasWire = showWireframe;
+  if (wasWire) currentModel.traverse(o => o.isMesh && (o.material.wireframe = false));
+
+  const done = () => {
+    if (wasWire) currentModel.traverse(o => o.isMesh && (o.material.wireframe = true));
+    exportBtnText.textContent = "Export";
+    exportBtn.disabled = false;
+  };
+
+  try {
+    if (fmt === "glb" || fmt === "gltf") {
+      const exporter = new THREE.GLTFExporter();
+      const binary = fmt === "glb";
+      exporter.parse(currentModel, result => {
+        if (binary) {
+          triggerDownload(new Blob([result], { type: "model/gltf-binary" }), "model.glb");
+        } else {
+          const json = JSON.stringify(result, null, 2);
+          triggerDownload(new Blob([json], { type: "model/gltf+json" }), "model.gltf");
+        }
+        showNote(`✓ Saved as model.${fmt}`);
+        done();
+      }, { binary });
+
+    } else if (fmt === "obj") {
+      const exporter = new THREE.OBJExporter();
+      const result = exporter.parse(currentModel);
+      triggerDownload(new Blob([result], { type: "text/plain" }), "model.obj");
+      showNote("✓ Saved as model.obj");
+      done();
+
+    } else if (fmt === "stl-bin" || fmt === "stl-ascii") {
+      const exporter = new THREE.STLExporter();
+      const binary = fmt === "stl-bin";
+      const result = exporter.parse(currentModel, { binary });
+      const blob = binary
+        ? new Blob([result], { type: "application/octet-stream" })
+        : new Blob([result], { type: "text/plain" });
+      triggerDownload(blob, "model.stl");
+      showNote(`✓ Saved as model.stl (${binary ? "binary" : "ASCII"})`);
+      done();
+
+    } else if (fmt === "ply-bin" || fmt === "ply-ascii") {
+      const exporter = new THREE.PLYExporter();
+      const binary = fmt === "ply-bin";
+      exporter.parse(currentModel, result => {
+        const blob = binary
+          ? new Blob([result], { type: "application/octet-stream" })
+          : new Blob([result], { type: "text/plain" });
+        triggerDownload(blob, "model.ply");
+        showNote(`✓ Saved as model.ply (${binary ? "binary" : "ASCII"})`);
+        done();
+      }, { binary });
+    }
+
+  } catch (err) {
+    showNote("⚠ Export failed: " + err.message);
+    console.error(err);
+    done();
+  }
 }
 
 function animate() {
-    requestAnimationFrame(animate);
-    if (currentModel) currentModel.rotation.y += 0.01;
-    controls.update();
-    renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+  if (currentModel) currentModel.rotation.y += 0.01;
+  controls.update();
+  renderer.render(scene, camera);
 }

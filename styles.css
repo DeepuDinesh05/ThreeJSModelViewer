@@ -8,15 +8,15 @@ body {
   position: absolute;
   top: 15px;
   left: 15px;
-  width: 320px;
+  width: 280px;
   z-index: 10;
 }
 
-#stats-panel {
+#right-panel {
   position: absolute;
   top: 15px;
   right: 15px;
-  width: 230px;
+  width: 260px;
   z-index: 10;
 }
 
@@ -60,6 +60,11 @@ input.form-control-color::-webkit-color-swatch-wrapper {
   --bs-btn-border-color: #dc3545;
 }
 
+[data-bs-theme="dark"] .btn-success {
+  --bs-btn-bg: #198754;
+  --bs-btn-border-color: #198754;
+}
+
 [data-bs-theme="dark"] input[type="range"]::-webkit-slider-runnable-track {
   background-color: #343a40;
 }
@@ -84,4 +89,10 @@ input.form-control-color::-webkit-color-swatch-wrapper {
 [data-bs-theme="dark"] .form-check-input:checked {
   background-color: var(--bs-warning);
   border-color: var(--bs-warning);
+}
+
+[data-bs-theme="dark"] .form-select {
+  background-color: #343a40;
+  color: #fff;
+  border-color: #495057;
 }
